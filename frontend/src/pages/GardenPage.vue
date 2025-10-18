@@ -34,10 +34,18 @@
           </p>
 
           <div class="price-row">
-            <button @click="addToBasket(flower)" class="basket-btn" title="Add to Basket">
+            <button
+              class="basket-btn"
+              :disabled="flower.quantity === 0"
+              @click="addToBasket(flower)"
+              :title="flower.quantity === 0 ? 'Out of Stock' : 'Add to Basket'"
+            >
               <img src="@/assets/basket-cart.png" alt="Basket" class="basket-icon" />
             </button>
-            <p class="price">₱{{ flower.price }}</p>
+            <p class="price">
+              <span v-if="flower.quantity === 0" style="color:#b22222;">Out of Stock</span>
+              <span v-else>₱{{ flower.price }}</span>
+            </p>
           </div>
         </div>
       </div>
@@ -69,10 +77,18 @@
           </p>
 
           <div class="price-row">
-            <button @click="addToBasket(flower)" class="basket-btn" title="Add to Basket">
+            <button
+              class="basket-btn"
+              :disabled="flower.quantity === 0"
+              @click="addToBasket(flower)"
+              :title="flower.quantity === 0 ? 'Out of Stock' : 'Add to Basket'"
+            >
               <img src="@/assets/basket-cart.png" alt="Basket" class="basket-icon" />
             </button>
-            <p class="price">₱{{ flower.price }}</p>
+            <p class="price">
+              <span v-if="flower.quantity === 0" style="color:#b22222;">Out of Stock</span>
+              <span v-else>₱{{ flower.price }}</span>
+            </p>
           </div>
         </div>
       </div>
@@ -83,13 +99,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useBasketStore } from '@/stores/basket.js'
 import axios from 'axios'
 
 const router = useRouter()
-const basket = useBasketStore()
 
-// 🛒 Go to single product view
 function goToProduct(flower) {
   router.push({
     path: "/singleproduct",
@@ -97,24 +110,22 @@ function goToProduct(flower) {
   });
 }
 
-// 🧺 Add to basket
+// 🧺 Add to basket with stock check
 async function addToBasket(flower) {
   try {
     const user = JSON.parse(localStorage.getItem("user"));
     if (!user || !user._id) {
-      alert("Please log in first!");
+      alert("⚠️ Please log in first!");
       return;
     }
 
-    const productRes = await axios.get(`http://localhost:3000/api/products`);
-    const product = productRes.data.find(
+    const res = await axios.get(`http://localhost:3000/api/products`);
+    const product = res.data.find(
       (p) => p.bouquet_name?.toLowerCase() === flower.name.toLowerCase()
     );
 
-    if (!product) {
-      alert("Product not found in database.");
-      return;
-    }
+    if (!product) return alert("❌ Product not found.");
+    if (product.quantity <= 0) return alert(`❌ ${flower.name} is out of stock.`);
 
     await axios.post("http://localhost:3000/api/basket", {
       user_id: user._id,
@@ -122,112 +133,102 @@ async function addToBasket(flower) {
       quantity: 1,
     });
 
-    alert(`${flower.name} added to basket!`);
+    alert(`✅ ${flower.name} added to basket!`);
   } catch (error) {
     console.error("❌ Failed to add to basket:", error);
-    alert("Failed to add item to basket.");
+    const msg = error.response?.data?.message || "Failed to add item to basket.";
+    alert(`❌ ${msg}`);
   }
 }
 
-// 🌸 FEATURED ONLY
+// 🌸 FEATURED — keep your original 3 featured items
 const featuredFlowers = ref([
-  { name: 'Pink Carnations', category: 'Romance', price: 1800, image: 'pink-carnations.png' },
-  { name: 'Blue Hydrangeas', category: 'Romance', price: 1800, image: 'blue-hydrangeas.png' },
-  { name: 'Lysianthus', category: 'Romance', price: 1800, image: 'lysianthus.png' },
+  { name: 'Pink Carnations', category: 'Romance', price: 1800, image: 'pink-carnations.png', quantity: 10 },
+  { name: 'Blue Hydrangeas', category: 'Romance', price: 1800, image: 'blue-hydrangeas.png', quantity: 10 },
+  { name: 'Lysianthus', category: 'Romance', price: 1800, image: 'lysianthus.png', quantity: 10 },
 ])
 
 // 🌿 CATEGORY setup
 const categories = ref(['Birthday', 'Romance', 'Congratulation', 'Sympathy'])
 const selectedCategory = ref('Birthday')
 
-// 🌼 Local flowers
+// 🌼 LOCAL FLOWERS — keep your original full set
 const flowers = ref([
   // ❤️ Romance
-  { name: 'Sunflower Bliss', category: 'Romance', price: 1200, image: 'sunflowerbliss.jpg' },
-  { name: 'Red Roses', category: 'Romance', price: 1800, image: 'red-roses.png' },
-  { name: 'Spring Harmony Tulips', category: 'Romance', price: 2000, image: 'springharmonytulips.jpg' },
-  { name: 'Red Carnations', category: 'Romance', price: 1800, image: 'red-carnations.png' },
-  { name: 'Pink Carnations', category: 'Romance', price: 1800, image: 'pink-carnations.png' },
-  { name: 'Blue Hydrangeas', category: 'Romance', price: 1800, image: 'blue-hydrangeas.png' },
-  { name: 'Lysianthus', category: 'Romance', price: 1800, image: 'lysianthus.png' },
+  { name: 'Sunflower Bliss', category: 'Romance', price: 1200, image: 'sunflowerbliss.jpg', quantity: 8 },
+  { name: 'Red Roses', category: 'Romance', price: 1800, image: 'red-roses.png', quantity: 5 },
+  { name: 'Spring Harmony Tulips', category: 'Romance', price: 2000, image: 'springharmonytulips.jpg', quantity: 7 },
+  { name: 'Red Carnations', category: 'Romance', price: 1800, image: 'red-carnations.png', quantity: 10 },
+  { name: 'Pink Carnations', category: 'Romance', price: 1800, image: 'pink-carnations.png', quantity: 9 },
+  { name: 'Blue Hydrangeas', category: 'Romance', price: 1800, image: 'blue-hydrangeas.png', quantity: 6 },
+  { name: 'Lysianthus', category: 'Romance', price: 1800, image: 'lysianthus.png', quantity: 8 },
 
   // 🎂 Birthday
-  { name: 'Lavender Tulip', category: 'Birthday', price: 2000, image: 'lavendertulip.jpg' },
-  { name: 'Pastel Bloom', category: 'Birthday', price: 1500, image: 'pastelbloom.jpg' },
-  { name: 'Sunshine Garden', category: 'Birthday', price: 1800, image: 'sunshinegarden.jpg' },
-  { name: 'Elegant Peach', category: 'Birthday', price: 1400, image: 'elegantpeach.jpg' },
+  { name: 'Lavender Tulip', category: 'Birthday', price: 2000, image: 'lavendertulip.jpg', quantity: 5 },
+  { name: 'Pastel Bloom', category: 'Birthday', price: 1500, image: 'pastelbloom.jpg', quantity: 8 },
+  { name: 'Sunshine Garden', category: 'Birthday', price: 1800, image: 'sunshinegarden.jpg', quantity: 6 },
+  { name: 'Elegant Peach', category: 'Birthday', price: 1400, image: 'elegantpeach.jpg', quantity: 10 },
 
   // 🎉 Congratulation
-  { name: 'Blush Elegance', category: 'Congratulation', price: 1700, image: 'blushelegance.jpg' },
-  { name: 'Golden Glow', category: 'Congratulation', price: 1600, image: 'goldenglow.jpg' },
-  { name: 'Blue Serenity', category: 'Congratulation', price: 1400, image: 'blueserenity.jpg' },
-  { name: 'Pink Basket Bloom', category: 'Congratulation', price: 1200, image: 'pinkbasketbloom.jpg' },
+  { name: 'Blush Elegance', category: 'Congratulation', price: 1700, image: 'blushelegance.jpg', quantity: 4 },
+  { name: 'Golden Glow', category: 'Congratulation', price: 1600, image: 'goldenglow.jpg', quantity: 5 },
+  { name: 'Blue Serenity', category: 'Congratulation', price: 1400, image: 'blueserenity.jpg', quantity: 5 },
+  { name: 'Pink Basket Bloom', category: 'Congratulation', price: 1200, image: 'pinkbasketbloom.jpg', quantity: 3 },
 
   // 🕊️ Sympathy
-  { name: 'Gentle Grace', category: 'Sympathy', price: 1800, image: 'gentlegrace.jpg' },
-  { name: 'Ivory Comfort', category: 'Sympathy', price: 1500, image: 'ivorycomfort.jpg' },
-  { name: 'Eternal Love', category: 'Sympathy', price: 2300, image: 'eternallove.jpg' },
-  { name: 'White Serenity', category: 'Sympathy', price: 1600, image: 'whiteserenity.jpg' },
+  { name: 'Gentle Grace', category: 'Sympathy', price: 1800, image: 'gentlegrace.jpg', quantity: 6 },
+  { name: 'Ivory Comfort', category: 'Sympathy', price: 1500, image: 'ivorycomfort.jpg', quantity: 4 },
+  { name: 'Eternal Love', category: 'Sympathy', price: 2300, image: 'eternallove.jpg', quantity: 5 },
+  { name: 'White Serenity', category: 'Sympathy', price: 1600, image: 'whiteserenity.jpg', quantity: 6 },
 ])
 
-// 🌻 Improved image resolver
+// 🌻 Image resolver
 function resolveImage(imagePath) {
-  if (!imagePath) {
-    return new URL("@/assets/placeholder.jpg", import.meta.url).href;
-  }
-
-  // ✅ Backend uploads
-  if (imagePath.startsWith("/uploads/")) {
-    return `http://localhost:3000${imagePath}`;
-  }
-
-  // ✅ Full URL
-  if (imagePath.startsWith("http")) {
-    return imagePath;
-  }
-
-  // ✅ Handle /src/assets/, src/assets/, or plain filename
-  const cleanPath = imagePath.replace(/^\/+/, "");
-  if (cleanPath.includes("src/assets/")) {
-    return new URL(cleanPath.replace("src/", "../"), import.meta.url).href;
-  }
-
-  // ✅ Default: filename only (e.g. red-roses.png)
-  return new URL(`../assets/${cleanPath}`, import.meta.url).href;
+  if (!imagePath) return new URL("@/assets/placeholder.jpg", import.meta.url).href;
+  if (imagePath.startsWith("/uploads/")) return `http://localhost:3000${imagePath}`;
+  if (imagePath.startsWith("http")) return imagePath;
+  const clean = imagePath.replace(/^\/+/, "");
+  return new URL(`../assets/${clean}`, import.meta.url).href;
 }
 
-// 🌸 Load DB products
+// 🌺 Load DB products — merge, not replace
 onMounted(async () => {
   try {
-    const res = await axios.get('http://localhost:3000/api/products')
+    const res = await axios.get('http://localhost:3000/api/products');
     const dbFlowers = res.data.map(f => ({
       name: f.bouquet_name?.trim() || f.name,
       category: f.category || 'Romance',
       price: f.price,
       image: f.image || f.product_image || '',
-    }))
+      quantity: f.quantity ?? 0,
+    }));
 
-    const existingNames = flowers.value.map(f => f.name.toLowerCase())
-    const unique = dbFlowers.filter(f => !existingNames.includes(f.name.toLowerCase()))
+    const existingNames = flowers.value.map(f => f.name.toLowerCase());
+    const unique = dbFlowers.filter(f => !existingNames.includes(f.name.toLowerCase()));
 
-    flowers.value.push(...unique)
-    console.log('✅ Added DB flowers:', unique)
+    if (unique.length > 0) {
+      flowers.value.push(...unique);
+      console.log('✅ Added new DB flowers:', unique);
+    } else {
+      console.log('🌸 No new DB products to add.');
+    }
   } catch (err) {
-    console.error('❌ Error loading DB products:', err)
+    console.error('❌ Error loading DB products:', err);
   }
-})
+});
 
 // 🌺 Filter by category
 const filteredFlowers = computed(() =>
   flowers.value.filter(
     f => f.category?.toLowerCase() === selectedCategory.value.toLowerCase()
   )
-)
+);
 
 function selectCategory(category) {
-  selectedCategory.value = category
+  selectedCategory.value = category;
 }
 </script>
+
 
 <style scoped>
 .garden-page {
