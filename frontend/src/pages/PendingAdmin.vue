@@ -33,7 +33,7 @@
         <tbody>
           <tr v-for="order in filteredOrders" :key="order._id">
             <td>{{ order._id }}</td>
-            <td>{{ order.delivery?.name || "N/A" }}</td>
+            <td>{{ order.customer }}</td>
             <td>₱{{ order.totalPrice }}</td>
             <td>{{ order.status }}</td>
             <td>
@@ -64,25 +64,31 @@ const orders = ref([]);
 const statuses = ["PENDING", "TO SHIP", "TO RECEIVE", "COMPLETED", "CANCELLED"];
 const selectedStatus = ref("PENDING");
 
+// ✅ Load all orders (joined with order_details, products, and info)
 onMounted(async () => {
-  await loadOrders();
-});
-
-// ✅ Fetch all orders for admin
-async function loadOrders() {
   try {
     const res = await axios.get("http://localhost:3000/api/orders/all");
-    orders.value = res.data;
-    console.log("✅ Loaded orders:", orders.value);
+    console.log("✅ Loaded raw orders:", res.data);
+
+    orders.value = res.data.map((o) => ({
+      _id: o._id,
+      // 🩷 Use user_info (from info collection)
+      customer: `${o.user_info?.firstname || "Unknown"} ${o.user_info?.lastname || ""}`.trim(),
+      // 🌸 If you later want product name: o.product_info?.bouquet_name
+      totalPrice: o.details?.total_price || 0,
+      status: o.details?.status || "PENDING",
+    }));
   } catch (err) {
     console.error("❌ Error loading orders:", err);
     alert("Failed to load orders. Please check backend connection.");
   }
-}
+});
 
-// ✅ Filter by selected status (e.g., PENDING, TO SHIP)
+// ✅ Filter by selected status
 const filteredOrders = computed(() =>
-  orders.value.filter((o) => o.status === selectedStatus.value)
+  orders.value.filter(
+    (o) => o.status.toUpperCase() === selectedStatus.value.toUpperCase()
+  )
 );
 
 // ✅ Update order status in backend
