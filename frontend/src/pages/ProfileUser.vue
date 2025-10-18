@@ -71,11 +71,10 @@
             <td>
               <div v-for="item in order.items" :key="item.product._id">
                 <img
-                  :src="getImageUrl(item.product?.product_image)"
+                  :src="getImageUrl(item.product?.product_image || item.product?.image)"
                   class="order-img"
-                  :alt="item.product?.bouquet_name"
+                  :alt="item.product?.bouquet_name || 'Flower image'"
                 />
-
                 <p>{{ item.product.bouquet_name }}</p>
               </div>
             </td>
@@ -102,12 +101,32 @@ const orders = ref([]);
 const statuses = ["PENDING", "TO SHIP", "TO RECEIVE", "COMPLETED", "CANCELLED"];
 const selectedStatus = ref("PENDING");
 
+// 🩷 FIXED IMAGE HANDLER
 function getImageUrl(path) {
-  if (!path) return new URL("@/assets/placeholder.jpg", import.meta.url).href;
-  const clean = path.replace(/^\/+/, ""); // remove leading slashes if any
-  return new URL(`/src/assets/${clean}`, import.meta.url).href;
-}
+  if (!path) {
+    return new URL("@/assets/placeholder.jpg", import.meta.url).href;
+  }
 
+  const clean = String(path).trim();
+
+  // ✅ Backend uploaded images
+  if (clean.startsWith("/uploads/")) {
+    return `http://localhost:3000${clean}`;
+  }
+
+  // ✅ Full URL
+  if (clean.startsWith("http")) {
+    return clean;
+  }
+
+  // ✅ Local asset image (like /src/assets/red-roses.png)
+  if (clean.includes("src/assets/")) {
+    return new URL(clean.replace("src/", "../"), import.meta.url).href;
+  }
+
+  // ✅ Plain filename (like red-roses.png)
+  return new URL(`../assets/${clean}`, import.meta.url).href;
+}
 
 onMounted(async () => {
   // ✅ Automatically detect the stored user key
