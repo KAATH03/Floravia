@@ -22,6 +22,8 @@ app.use(
 
 app.use(express.json());
 
+app.use("/uploads", express.static("uploads"));
+
 // 🌸 Health check route
 app.get("/", (req, res) => res.send("Floravia API is running 🌸"));
 
