@@ -2,74 +2,88 @@ import User from "../models/user.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-// ✅ SIGNUP
-export const signup = async (req, res) => {
+/* =========================================================
+   ✨ CREATE USER (Sign Up)
+   ========================================================= */
+export const createUser = async (req, res) => {
   try {
-    const { username, firstname, lastname, email, phone, password, role } = req.body;
-    const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ message: "Email already registered" });
+    const { username, email, password, firstname, lastname, phone } = req.body;
 
-    const hashed = await bcrypt.hash(password, 10);
-    await User.create({
+    const existing = await User.findOne({ email });
+    if (existing)
+      return res.status(400).json({ message: "Email already registered" });
+
+    const user = await User.create({
       username,
+      email,
+      password,
       firstname,
       lastname,
-      email,
       phone,
-      password: hashed,
-      role: role || "user", // Default to user
     });
 
-    res.status(201).json({ message: "User created successfully" });
+    res.status(201).json({
+      message: "✅ User created successfully",
+      user,
+    });
   } catch (err) {
-    res.status(500).json({ message: "Signup failed", error: err.message });
+    console.error("❌ Error creating user:", err);
+    res.status(500).json({ message: "Server error creating user" });
   }
 };
 
-// ✅ LOGIN
-export const login = async (req, res) => {
+/* =========================================================
+   🌸 LOGIN USER
+   ========================================================= */
+export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const u = await User.findOne({ email });
-    if (!u) return res.status(404).json({ message: "User not found" });
+    const user = await User.findOne({ email });
 
-    const ok = await bcrypt.compare(password, u.password);
-    if (!ok) return res.status(400).json({ message: "Invalid credentials" });
-
-    const token = jwt.sign({ id: u._id, role: u.role }, process.env.JWT_SECRET, { expiresIn: "1d" });
+    if (!user || user.password !== password)
+      return res.status(400).json({ message: "Invalid credentials" });
 
     res.json({
-      token,
-      user: {
-        id: u._id,
-        username: u.username,
-        firstname: u.firstname,
-        lastname: u.lastname,
-        email: u.email,
-        phone: u.phone,
-        address: u.address,
-        role: u.role, // Important for redirect
-      },
+      message: "✅ Login successful",
+      user,
     });
   } catch (err) {
-    console.error("Login error:", err);
+    console.error("❌ Error logging in:", err);
     res.status(500).json({ message: "Server error during login" });
   }
 };
 
-// ✅ GET PROFILE
-export const me = async (req, res) => {
-  const u = await User.findById(req.user.id).select("-password");
-  res.json(u);
+/* =========================================================
+   🌿 GET ALL USERS
+   ========================================================= */
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find();
+    res.json(users);
+  } catch (err) {
+    console.error("❌ Error fetching users:", err);
+    res.status(500).json({ message: "Server error fetching users" });
+  }
 };
 
-// ✅ UPDATE PROFILE
-export const updateMe = async (req, res) => {
-  const allowed = ["username", "firstname", "lastname", "phone", "address"];
-  const payload = Object.fromEntries(
-    Object.entries(req.body).filter(([k]) => allowed.includes(k))
-  );
+/* =========================================================
+   🩷 UPDATE ADDRESS (NEW)
+   ========================================================= */
+export const updateAddress = async (req, res) => {
+  try {
+    const { address } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-  const u = await User.findByIdAndUpdate(req.user.id, payload, { new: true }).select("-password");
-  res.json(u);
+    user.address = address;
+    await user.save();
+
+    res.json({
+      message: "✅ Address updated successfully",
+      user,
+    });
+  } catch (err) {
+    console.error("❌ Error updating address:", err);
+    res.status(500).json({ message: "Server error updating address" });
+  }
 };
