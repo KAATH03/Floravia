@@ -30,7 +30,7 @@
         <h3 class="section-title">Products Ordered</h3>
         <div v-for="(item, index) in basket" :key="index" class="product-line">
           <div class="product-info">
-            <!-- 🩷 FIXED IMAGE HANDLING -->
+            <!-- image handling -->
             <img
               :src="getImageUrl(item.product_id?.product_image || item.product_id?.image)"
               class="product-img"
@@ -85,34 +85,28 @@ const basket = ref([]);
 const user = ref(null);
 const paymentMethod = ref("Cash on Delivery");
 
-// 🖼️ FIXED IMAGE HELPER
+// NEW: track if this checkout was started via "Buy Now"
+const isBuyNow = ref(false);
+
+// image helper
 function getImageUrl(path) {
   if (!path) {
     return new URL("@/assets/placeholder.jpg", import.meta.url).href;
   }
-
   const clean = String(path).trim();
-
-  // ✅ Case 1: backend upload (e.g. "/uploads/products/flower.png")
   if (clean.startsWith("/uploads/")) {
     return `http://localhost:3000${clean}`;
   }
-
-  // ✅ Case 2: already a full URL
   if (clean.startsWith("http")) {
     return clean;
   }
-
-  // ✅ Case 3: local src/assets image
   if (clean.includes("src/assets/")) {
     return new URL(clean.replace("src/", "../"), import.meta.url).href;
   }
-
-  // ✅ Case 4: only filename (e.g. "red-roses.png")
   return new URL(`../assets/${clean}`, import.meta.url).href;
 }
 
-// 💰 total
+// total
 const totalPrice = computed(() =>
   basket.value.reduce(
     (sum, item) => sum + (item.product_id?.price || 0) * item.quantity,
@@ -120,7 +114,7 @@ const totalPrice = computed(() =>
   )
 );
 
-// 🧺 Load basket or buy-now item
+// Load basket or buy-now item
 onMounted(async () => {
   const stored = localStorage.getItem("user");
   if (stored) user.value = JSON.parse(stored);
@@ -131,26 +125,28 @@ onMounted(async () => {
     return;
   }
 
-  // ✅ Check if user clicked “Buy Now”
+  // Check if user clicked “Buy Now”
   const buyNowItem = JSON.parse(localStorage.getItem("buyNow"));
   if (buyNowItem) {
+    isBuyNow.value = true; // <-- remember we came from Buy Now
+
     basket.value = [
       {
         product_id: {
           _id: buyNowItem.product_id,
           bouquet_name: buyNowItem.bouquet_name,
           price: buyNowItem.price,
-          // 🩷 keep raw image name, fix handled by getImageUrl()
-          product_image: buyNowItem.image,
+          product_image: buyNowItem.image, // let getImageUrl resolve it
         },
         quantity: buyNowItem.quantity,
       },
     ];
+    // clear the flag from storage (we already captured it in isBuyNow)
     localStorage.removeItem("buyNow");
-    return;
+    return; // skip full basket fetch
   }
 
-  // ✅ Otherwise, load user’s basket
+  // Otherwise, load user’s basket
   try {
     const res = await axios.get(
       `http://localhost:3000/api/basket/${user.value._id}`
@@ -163,7 +159,7 @@ onMounted(async () => {
   }
 });
 
-// 🛒 place order
+// place order
 async function buyNow() {
   if (!basket.value.length) {
     alert("🛒 Your basket is empty.");
@@ -193,14 +189,16 @@ async function buyNow() {
     );
 
     console.log("✅ Order placed:", res.data);
-    alert(
-      `✅ Order placed successfully!\nPayment Method: ${paymentMethod.value}`
-    );
+    alert(`✅ Order placed successfully!\nPayment Method: ${paymentMethod.value}`);
 
-    // ✅ Clear basket after order
-    await axios.delete(
-      `http://localhost:3000/api/basket/clear/${user.value._id}`
-    );
+    // IMPORTANT:
+    // Only clear the server basket when this is a real "basket checkout".
+    // For "Buy Now", leave the user's basket untouched.
+    if (!isBuyNow.value) {
+      await axios.delete(
+        `http://localhost:3000/api/basket/clear/${user.value._id}`
+      );
+    }
 
     router.push("/profile");
   } catch (err) {
