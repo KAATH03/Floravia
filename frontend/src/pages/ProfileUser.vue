@@ -66,21 +66,20 @@
             <th>STATUS</th>
           </tr>
         </thead>
+
         <tbody>
           <tr v-for="order in filteredOrders" :key="order._id">
             <td>
-              <div v-for="item in order.items" :key="item.product._id">
-                <img
-                  :src="getImageUrl(item.product?.product_image || item.product?.image)"
-                  class="order-img"
-                  :alt="item.product?.bouquet_name || 'Flower image'"
-                />
-                <p>{{ item.product.bouquet_name }}</p>
-              </div>
+              <img
+                :src="getImageUrl(order.product_info?.product_image || order.product_info?.image)"
+                class="order-img"
+                :alt="order.product_info?.bouquet_name || 'Flower image'"
+              />
+              <p>{{ order.product_info?.bouquet_name || 'Unnamed Product' }}</p>
             </td>
             <td>{{ order._id }}</td>
-            <td>₱{{ order.totalPrice }}</td>
-            <td>{{ order.status }}</td>
+            <td>₱{{ order.details?.total_price || 0 }}</td>
+            <td>{{ order.details?.status || 'PENDING' }}</td>
           </tr>
         </tbody>
       </table>
@@ -101,87 +100,62 @@ const orders = ref([]);
 const statuses = ["PENDING", "TO SHIP", "TO RECEIVE", "COMPLETED", "CANCELLED"];
 const selectedStatus = ref("PENDING");
 
-// 🩷 FIXED IMAGE HANDLER
+// 🖼️ Image helper
 function getImageUrl(path) {
-  if (!path) {
-    return new URL("@/assets/placeholder.jpg", import.meta.url).href;
-  }
-
+  if (!path) return new URL("@/assets/placeholder.jpg", import.meta.url).href;
   const clean = String(path).trim();
-
-  // ✅ Backend uploaded images
-  if (clean.startsWith("/uploads/")) {
-    return `http://localhost:3000${clean}`;
-  }
-
-  // ✅ Full URL
-  if (clean.startsWith("http")) {
-    return clean;
-  }
-
-  // ✅ Local asset image (like /src/assets/red-roses.png)
-  if (clean.includes("src/assets/")) {
-    return new URL(clean.replace("src/", "../"), import.meta.url).href;
-  }
-
-  // ✅ Plain filename (like red-roses.png)
+  if (clean.startsWith("/uploads/")) return `http://localhost:3000${clean}`;
+  if (clean.startsWith("http")) return clean;
   return new URL(`../assets/${clean}`, import.meta.url).href;
 }
 
 onMounted(async () => {
-  // ✅ Automatically detect the stored user key
-  const possibleKeys = ["user", "userInfo", "info", "customer"];
-  for (const key of possibleKeys) {
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      user.value = JSON.parse(stored);
-      console.log("✅ Loaded user:", user.value);
-      break;
-    }
-  }
-
-  if (!user.value) {
-    alert("⚠️ Please log in first.");
-    return router.push("/login");
-  }
+  const stored = localStorage.getItem("user");
+  if (stored) user.value = JSON.parse(stored);
+  else return router.push("/login");
 
   address.value = user.value.address || "";
 
   try {
-    // ✅ Determine the correct userId field
-    const userId = user.value._id || user.value.id || user.value.userId;
-    console.log("🧾 Using userId:", userId);
-
-    if (!userId) {
-      console.error("❌ No valid user ID found in:", user.value);
-      alert("Cannot load orders — missing user ID.");
-      return;
-    }
-
-    // ✅ Fetch orders with correct ID
-    const res = await axios.get(`http://localhost:3000/api/orders/my?userId=${userId}`);
+    const userId = user.value._id;
+    const res = await axios.get(
+      `http://localhost:3000/api/orders/my?userId=${userId}`
+    );
+    console.log("✅ Raw user orders:", res.data);
     orders.value = res.data;
-    console.log("✅ Orders fetched:", orders.value);
   } catch (err) {
-    console.error("❌ Error loading orders:", err.response?.data || err);
+    console.error("❌ Error loading orders:", err);
+    alert("Failed to load orders. Please try again later.");
   }
 });
 
-const saveAddress = () => {
+// ✅ Filter by selected status (from order.details.status)
+const filteredOrders = computed(() =>
+  orders.value.filter(
+    (o) =>
+      o.details?.status?.toUpperCase() === selectedStatus.value.toUpperCase()
+  )
+);
+
+const saveAddress = async () => {
   if (!address.value.trim()) return alert("Please enter your address.");
-  user.value.address = address.value;
-  localStorage.setItem("user", JSON.stringify(user.value));
-  alert("✅ Address saved!");
+  try {
+    const res = await axios.patch(
+      `http://localhost:3000/api/users/${user.value._id}/address`,
+      { address: address.value }
+    );
+    user.value.address = res.data.user.address;
+    localStorage.setItem("user", JSON.stringify(user.value));
+    alert("✅ Address saved!");
+  } catch (err) {
+    console.error("❌ Error saving address:", err);
+  }
 };
 
 const logout = () => {
   localStorage.removeItem("user");
   router.push("/login");
 };
-
-const filteredOrders = computed(() =>
-  orders.value.filter((o) => o.status === selectedStatus.value)
-);
 </script>
 
 <style scoped>
@@ -190,14 +164,14 @@ const filteredOrders = computed(() =>
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-family: 'Outfit', sans-serif;
+  font-family: "Outfit", sans-serif;
   overflow-x: hidden;
 }
 
 /* 🌼 Profile Section */
 .profile-section {
   width: 100%;
-  background-image: url('@/assets/profilebg.png');
+  background-image: url("@/assets/profilebg.png");
   background-size: cover;
   background-position: center;
   padding: 60px 20px;
@@ -238,7 +212,7 @@ const filteredOrders = computed(() =>
 }
 
 .logout-btn {
-  font-family: 'Outfit', sans-serif;
+  font-family: "Outfit", sans-serif;
   background-color: #9a9d68;
   color: white;
   border: none;
@@ -291,7 +265,7 @@ input {
 }
 
 .save-btn {
-  font-family: 'Outfit', sans-serif;
+  font-family: "Outfit", sans-serif;
   background-color: #f8d2bb;
   color: #5b6239;
   border: none;
@@ -329,7 +303,7 @@ input {
 
 .featured-oval h2 {
   color: #f8d2bb;
-  font-family: 'Caprasimo', sans-serif;
+  font-family: "Caprasimo", sans-serif;
   font-size: 48px;
   font-weight: 100;
   margin: 0;
@@ -361,7 +335,7 @@ input {
   padding: 30px 50px;
   cursor: pointer;
   color: #f5f0ec;
-  font-family: 'Outfit', sans-serif;
+  font-family: "Outfit", sans-serif;
   font-size: 20px;
   font-weight: 400;
 }
