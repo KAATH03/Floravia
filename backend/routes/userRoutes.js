@@ -2,6 +2,7 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/user.js";
 import Admin from "../models/admin.js"; // ✅ import admin model
+import { updateAddress } from "../controllers/userController.js"; // ✅ ADD THIS
 
 const router = express.Router();
 
@@ -84,5 +85,8 @@ router.post("/login", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// 🏠 ✅ UPDATE ADDRESS (NEW ROUTE)
+router.patch("/:id/address", updateAddress);
 
 export default router;
