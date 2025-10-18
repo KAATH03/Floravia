@@ -98,12 +98,46 @@ export const updateStatus = async (req, res) => {
       "COMPLETED",
       "CANCELLED",
     ];
+
     if (!allowed.includes(status))
       return res.status(400).json({ message: "Invalid status" });
 
-    const order = await Order.findById(req.params.id);
+    // ✅ Load order WITH populated product details
+    const order = await Order.findById(req.params.id).populate({
+      path: "items.product",
+      model: "Product",
+      select: "bouquet_name quantity",
+    });
+
     if (!order) return res.status(404).json({ message: "Order not found" });
 
+    // ✅ Restore stock ONLY if this is first time cancelling
+    if (status === "CANCELLED" && order.status !== "CANCELLED") {
+      console.log(`🔄 Restoring stock for cancelled order: ${order._id}`);
+
+      for (const item of order.items) {
+        // Make sure we have a valid product ID
+        const productId =
+          item.product?._id || item.product || item.product_id || null;
+
+        if (productId) {
+          const product = await Product.findById(productId);
+          if (product) {
+            product.quantity += item.quantity;
+            await product.save();
+            console.log(
+              `✅ Restocked ${item.quantity}x ${product.bouquet_name || product.name}`
+            );
+          } else {
+            console.warn(`⚠️ Product not found for item: ${productId}`);
+          }
+        } else {
+          console.warn("⚠️ No product reference found in order item:", item);
+        }
+      }
+    }
+
+    // ✅ Update order status
     order.status = status;
     await order.save();
 
@@ -116,6 +150,7 @@ export const updateStatus = async (req, res) => {
     res.status(500).json({ message: "Server error updating status" });
   }
 };
+
 
 /* =========================================================
    🌼 GET ALL ORDERS — GET /api/orders/all
@@ -133,3 +168,4 @@ export const getAllOrders = async (req, res) => {
     res.status(500).json({ message: "Server error fetching all orders" });
   }
 };
+
